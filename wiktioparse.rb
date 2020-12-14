@@ -20,11 +20,12 @@ require 'twitter_cldr'
 ## Constants
 ##############################
 
-$WiktionaryUrl          = "https://en.wiktionary.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&formatversion=2&titles="
+$WiktionaryUrl              = "https://en.wiktionary.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&formatversion=2&titles="
 
-$PartsOfSpeech          = ["Adjective", "Adverb", "Noun", "Verb"]
-$CollapsableSections    = ["Alternative forms", "Anagrams", "Antonyms", "Conjugation", "Declension", "Derived terms", "Descendants", "Etymology", "Pronunciation", "Related terms", "Romanization", "See also", "Synonyms", "Translations"]
-$IgnoredSections        = ["Further reading", "Usage notes"]
+$PartsOfSpeech              = ["Adjective", "Adverb", "Noun", "Verb"]
+$CollapsableSections        = ["Alternative forms", "Anagrams", "Antonyms", "Conjugation", "Declension", "Derived terms", "Descendants", "Pronunciation", "Related terms", "Romanization", "See also", "Synonyms", "Translations"]
+$SemiCollapsableSections    = ["Etymology"]
+$IgnoredSections            = ["Further reading", "References", "Usage notes"]
 
 ## Helpers
 ##############################
@@ -122,6 +123,15 @@ class WiktioParse
                 tree.delete(k)
             end
 
+            if k.containsOneOf $SemiCollapsableSections
+                cleanedDash = stripEmptyLines(tree[k]["_"])
+                if tree[k].keys.count == 1
+                    tree[k] = cleanedDash
+                else
+                    tree[k]["_"] = cleanedDash
+                end
+            end 
+
             if k.containsOneOf $CollapsableSections
                 tree[k] = stripEmptyLines(tree[k]["_"])
             else
@@ -129,7 +139,38 @@ class WiktioParse
                     cleanupTree(tree[k], level+1)
                 end
             end
+
+            if k =~ /Etymology \d/
+                tree["Forms"]=[] if not tree.key? "Forms"
+                processed = tree[k]
+                if processed.key? "_"
+                    processed["Etymology"] = processed["_"]
+                    processed.delete("_")
+                end
+
+                tree["Forms"] << processed
+                tree.delete(k)
+            end
         }
+
+        tree.each{|k,v|
+            if v.is_a? Hash and not v.key? "Forms"
+                subforms = []
+                $PartsOfSpeech.each{|pos|
+                    if v.key? pos 
+                        subforms << {
+                            pos => v[pos]
+                        }
+                        tree[k].delete(pos)
+                    end
+                }
+                if subforms!=[]
+                    tree[k]["Forms"] = subforms
+                end
+            end
+        }
+
+        return tree
     end
 
     def fetch()
@@ -145,11 +186,53 @@ class WiktioParse
         end
     end
 
+    def doTranslations(tree, language=nil, level=0)
+        return unless tree.is_a? Hash
+
+        tree.each{|k,v|
+            if level==0
+                language = k
+            end
+
+            if k=="Translations"
+                if (m=v[0].match (/see translation subpage\|([^\}]+)/))
+                    pos = m.captures[0]
+                    subwp = WiktioParse.new(@word + "/translations")
+                    subtrans = subwp.process()[language]
+
+                    if subtrans.key? "Forms"
+                        subtrans["Forms"].each{|form|
+                            if form.key? pos
+                                subtrans = form[pos]["Translations"]
+                                break
+                            end
+                        }
+                    else
+                        subtrans = subtrans[pos]["Translations"]
+                    end
+
+                    tree[k] = subtrans
+                end
+            else
+                if k=="Forms"
+                    v.each{|form|
+                        doTranslations(form, language, level+1)
+                    }
+                else
+                    doTranslations(v, language, level+1)
+                end
+            end
+        }
+    end
+
     def process()
         fetched = fetch()
         return nil if fetched.nil?
 
         data = cleanupTree(treeify(fetched))
+
+        doTranslations(data)
+
         return data
     end
 end
