@@ -1534,7 +1534,7 @@ end
 -- Return the actual IPA corresponding to Cyrillic text as a single string.
 -- This is a wrapper around export.ipa(), which returns a list; if that
 -- function returns more than one item, they are separated by ", ".
-function export.ipa_string(text, adj, gem, bracket, pos, zhpal, is_transformed)
+function export.convertToIPA(text, adj, gem, bracket, pos, zhpal, is_transformed)
 	local ipa_list = export.ipa(text, adj, gem, bracket, pos, zhpal, is_transformed)
 	return table.concat(ipa_list, ", ")
 end
