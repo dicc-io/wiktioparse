@@ -15,7 +15,7 @@ local U = mw.ustring.char
 function export.format_IPA_full(lang, items, err, separator, sortKey, no_count)
 	local IPA_key, key_link, err_text, prefix, IPAs, category
 	local hasKey = m_data.langs_with_infopages
-	local namespace = mw.title.getCurrentTitle().nsText
+	--local namespace = mw.title.getCurrentTitle().nsText
 	
 	if err then
 		err_text = '<span class="error">' .. err .. '</span>'
@@ -128,17 +128,17 @@ function export.format_IPA_multiple(lang, items, separator, no_count)
 		if lang then
 			-- Add syllable count if the language's diphthongs are listed in [[Module:syllables]].
 			-- Don't do this if the term has spaces or a liaison mark (‿).
-			if not no_count and mw.title.getCurrentTitle().namespace == 0 then
-				m_syllables = m_syllables or require('Module:syllables')
-				if m_data.langs_to_generate_syllable_count_categories[lang:getCode()] and
-						(determine_repr(item.pron) == "phonemic" or lang:getCode() == "ru") and
-						not find(item.pron, "[ ‿]") then
-					local syllable_count = m_syllables.getVowels(item.pron, lang)
-					if syllable_count then
-						table.insert(categories, "[[Category:" .. lang:getCanonicalName() .. " " .. syllable_count .. "-syllable words]]")
-					end	
-				end
-			end
+			-- if not no_count and mw.title.getCurrentTitle().namespace == 0 then
+			-- 	m_syllables = m_syllables or require('Module:syllables')
+			-- 	if m_data.langs_to_generate_syllable_count_categories[lang:getCode()] and
+			-- 			(determine_repr(item.pron) == "phonemic" or lang:getCode() == "ru") and
+			-- 			not find(item.pron, "[ ‿]") then
+			-- 		local syllable_count = m_syllables.getVowels(item.pron, lang)
+			-- 		if syllable_count then
+			-- 			table.insert(categories, "[[Category:" .. lang:getCanonicalName() .. " " .. syllable_count .. "-syllable words]]")
+			-- 		end	
+			-- 	end
+			-- end
 
 			if lang:getCode() == "en" and hasInvalidSeparators(item.pron) then
 				table.insert(categories, "[[Category:IPA for English using .ˈ or .ˌ]]")

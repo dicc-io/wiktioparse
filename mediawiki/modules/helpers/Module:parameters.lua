@@ -193,21 +193,21 @@ function export.process(args, params, return_unknown)
 	
 	-- The required table should now be empty.
 	-- If any entry remains, trigger an error, unless we're in the template namespace.
-	if mw.title.getCurrentTitle().nsText ~= "Template" then
-		local list = {}
-		for name, param in pairs(required) do
-			table.insert(list, name)
-		end
+	-- if mw.title.getCurrentTitle().nsText ~= "Template" then
+	-- 	local list = {}
+	-- 	for name, param in pairs(required) do
+	-- 		table.insert(list, name)
+	-- 	end
 		
-		local count = #list
-		if count == 1 then
-			error('The parameter "' .. list[1] .. '" is required.', 2)
-		elseif count == 2 then
-			error('The parameters "' .. table.concat(list, '" and "') .. '" are required.', 2)
-		elseif count > 2 then
-			error('The parameters "' .. mw.text.listToText(list, '", "', '", and "') .. '" are required.', 2)
-		end
-	end
+	-- 	local count = #list
+	-- 	if count == 1 then
+	-- 		error('The parameter "' .. list[1] .. '" is required.', 2)
+	-- 	elseif count == 2 then
+	-- 		error('The parameters "' .. table.concat(list, '" and "') .. '" are required.', 2)
+	-- 	elseif count > 2 then
+	-- 		error('The parameters "' .. mw.text.listToText(list, '", "', '", and "') .. '" are required.', 2)
+	-- 	end
+	-- end
 	
 	-- Remove holes in any list parameters if needed.
 	for name, val in pairs(args_new) do

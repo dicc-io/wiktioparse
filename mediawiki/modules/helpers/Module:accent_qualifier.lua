@@ -2,7 +2,7 @@ local export = {}
 local m_qualifier = require("Module:qualifier")
 
 function export.format_qualifiers(qualifiers)
-	local m_data = mw.loadData("Module:accent qualifier/data")
+	local m_data = mw.loadData("Module:accent_qualifier/data")
 	
 	if type(qualifiers) ~= "table" then
 		qualifiers = { qualifiers }
