@@ -8,6 +8,7 @@ function export.convertToIPA(word, LatinAmerica, phonetic, do_debug)
 		do_debug = word.args[4]
 		word = word.args[1]
 	end
+	phonetic = true
 	local orig_word = word
 	word = mw.ustring.lower(word or mw.title.getCurrentTitle().text)
 	word = mw.ustring.gsub(word, "[^abcdefghijklmnopqrstuvwxyzáéíóúüñ.]", "")
