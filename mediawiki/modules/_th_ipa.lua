@@ -294,13 +294,15 @@ local partial_pattern = "^([เแโใไ]?)([ก-รลว-ฮ])(ฺ?[รล�
 
 function export.translit(text, lang, sc, mode, source)
 	local seq = systems[mode]
-	for word in mw.ustring.gmatch(text, thai_range .. "+") do
+    for word in mw.ustring.gmatch(text, thai_range .. "+") do
+        --print("word = ",word)
 		local orig_word, class, tMark, tone, long, c2 = word, "", false, false, false, false
-		if match(word, "[่้๊๋̄].?[่้๊๋̄]") then
+        if match(word, "[่้๊๋̄].?[่้๊๋̄]") then
 			return nil
 		end
 
-		local function c2_decomp(c2_char, seq, source)
+        local function c2_decomp(c2_char, seq, source)
+            print("C:",c2_char)
 			local converted_c2 = {}
 			for character in mw.text.gsplit(c2_char, "") do
 				table.insert(converted_c2, coda[character] and coda[character][seq] or nil)
@@ -313,7 +315,8 @@ function export.translit(text, lang, sc, mode, source)
 			end
 		end
 		
-		local function syllable(v1, c1, g, v2, c2)
+        local function syllable(v1, c1, g, v2, c2)
+            print("v1=",v1,",c1=",c1)
 			tMark = match(v2, "[่้๊๋̄]")
 			v2 = gsub(v2, "[่้๊๋̄]", "")
 			
@@ -374,12 +377,16 @@ function export.translit(text, lang, sc, mode, source)
 		end
 		
 		word = gsub(word, full_pattern, syllable)
-		word = gsub(word, partial_pattern, syllable)
+        word = gsub(word, partial_pattern, syllable)
+        
+        print("word=>",word)
 
 		text = gsub(text, orig_word, word, 1)
 	end
 
-	text = gsub(text, "[๐-๙]", symbols)
+    text = gsub(text, "[๐-๙]", symbols)
+    
+    print(text)
 
 	-- postprocessing
 	if mode == "royin" then
@@ -439,17 +446,17 @@ function export.getCharSeqTbl(text)
 	local result = {}
 	for character in mw.text.gsplit(text, "") do
 		local charDetail = char_table[character] or nil
-		
-		if find(character, front_v) then
-			table.insert(result, tostring( mw.html.create( "span" )
-				:css( "border", "1px dotted gray" )
-				:css( "border-radius", "50%" )
-				:css( "cursor", "help" )
-				:attr( "title", "Vowel sign appearing in front of the initial consonant." )
-				:wikitext( charDetail )))
-		else
-			table.insert(result, annotate(charDetail, char_annotation[character]))
-		end
+		print(charDetail)
+		-- if find(character, front_v) then
+		-- 	table.insert(result, tostring( mw.html.create( "span" )
+		-- 		:css( "border", "1px dotted gray" )
+		-- 		:css( "border-radius", "50%" )
+		-- 		:css( "cursor", "help" )
+		-- 		:attr( "title", "Vowel sign appearing in front of the initial consonant." )
+		-- 		:wikitext( charDetail )))
+		-- else
+		-- 	table.insert(result, annotate(charDetail, char_annotation[character]))
+		-- end
 	end
 	return result
 end
@@ -718,7 +725,9 @@ function export.show(frame)
 end
 
 function export.convertToIPA(word)
-    return export.translit(word, "th", "Thai", "ipa", "pron-module")
+    ---return getCharSeq(word)
+    return export.translit(word, "Thai", "th", "ipa", "pron-module")
+    --return export.translit(word, "th", "Thai", "ipa", "pron-module")
     --table.concat(result["ipa"])
 end
 
