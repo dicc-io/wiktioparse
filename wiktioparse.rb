@@ -17,6 +17,13 @@ require 'json'
 require 'open-uri'
 require 'twitter_cldr'
 
+require './mw'
+
+## Globals
+##############################
+
+$IPA = MW::IPA.new
+
 ## Constants
 ##############################
 
@@ -102,7 +109,7 @@ class WiktioParse
                 current["_"] = []
 
                 currentLevel = level
-                puts "found level #{level} -> #{header}"
+                puts ("\t" * (level-1)) + header
             else
                 # add line to current section
 
@@ -196,179 +203,138 @@ class WiktioParse
         end
     end
 
-    def doPronunciation(tree)
+    def processSubTree(tree, labels, action, preaction=nil, language=nil, level=0)
         return unless tree.is_a? Hash
-
-        def convertPronunciation(lst)
-            result = []
-            lst.each{|line|
-                pron = {}
-                if (m=line.match(/\{\{.+IPA\|(?:[a-z]+\|)?([^\}]+)\}\}/))
-                    ipa = m.captures[0]
-                    pron["ipa"] = ipa.cleanIPA()
-                end
-                if (m=line.match(/\{\{a\|([^\}]+)\}\}/))
-                    tag = m.captures[0]
-                    pron["tag"] = tag
-                end
-
-                if pron.keys.count > 0 and pron.key? "ipa"
-                    result << pron
-                end
-            }
-
-            return result
-        end
-
-        tree.each{|k,v|
-            if k=="Pronunciation"
-                tree[k] = convertPronunciation(v)
-            else
-                if k=="Forms"
-                    v.each{|form|
-                        doPronunciation(form)
-                    }
-                else
-                    doPronunciation(v)
-                end
-            end
-        }
-    end
-
-    def doTerms(tree)
-        return unless tree.is_a? Hash
-
-        def convertTerms(lst)
-            result = []
-            lst.each{|line|
-                if (m=line.match(/.*\|([^\}]+)$/))
-                    if m.captures[0]!="en"
-                        result << m.captures[0].strip
-                    end
-                end
-            }
-
-            return result
-        end
-
-        tree.each{|k,v|
-            if k=="Derived terms" or k=="Related terms"
-                tree[k] = convertTerms(v)
-            else
-                if k=="Forms"
-                    v.each{|form|
-                        doTerms(form)
-                    }
-                else
-                    doTerms(v)
-                end
-            end
-        }
-    end
-
-    def doOnyms(tree)
-        return unless tree.is_a? Hash
-
-        def convertOnyms(lst)
-            result = {}
-            lst.each{|line|
-                if (m=line.match(/\{\{sense\|([^\}]+)\}\}/))
-                    sense = m.captures[0]
-                    result[sense] = []
-
-                    if (matches=line.scan(/\{\{l\|[a-z]+\|([^\}\|]+)(?:\||\})/))
-                        matches.each{|m|
-                            result[sense] << m[0].strip
-                        }
-                    end
-                end
-            }
-
-            return result
-        end
-
-        tree.each{|k,v|
-            if k=="Synonyms" or k=="Antonyms"
-                tree[k] = convertOnyms(v)
-            else
-                if k=="Forms"
-                    v.each{|form|
-                        doOnyms(form)
-                    }
-                else
-                    doOnyms(v)
-                end
-            end
-        }
-    end
-
-    def doTranslations(tree, language=nil, level=0)
-        return unless tree.is_a? Hash
-
-        def convertTranslations(lst)
-            dict = {}
-            sense = ""
-
-            lst.each{|line|
-                if (m=line.match(/\{\{trans-top\|([^\}]+)\}\}/))
-                    sense = m.captures[0].strip
-                    dict[sense] = {}
-                else
-                    matches = line.scan(/\{\{t\+?\|([a-z]+)\|([^\}\|]+)(?:\||\})/)
-                    matches.each{|m|
-                        lang = m[0].strip
-                        word = m[1].strip
-
-                        dict[sense][lang] = [] if not dict[sense].key? lang
-
-                        dict[sense][lang] << word.cleanupWikitext()
-                    }
-                    if matches.count > 0
-                        ap matches
-                    end
-                end
-            }
-
-            return dict
-        end
 
         tree.each{|k,v|
             if level==0
                 language = k
             end
 
-            if k=="Translations"
-                if (m=v[0].match (/see translation subpage\|([^\}]+)/))
-                    pos = m.captures[0]
-                    subwp = WiktioParse.new(@word + "/translations")
-                    subtrans = subwp.process()[language]
-
-                    if subtrans.key? "Forms"
-                        subtrans["Forms"].each{|form|
-                            if form.key? pos
-                                subtrans = form[pos]["Translations"]
-                                break
-                            end
-                        }
-                    else
-                        subtrans = subtrans[pos]["Translations"]
-                    end
-
-                    tree[k] = subtrans
-                    doTranslations(tree[k], language, level+1)
+            if labels.include? k
+                if preaction.nil?
+                    tree[k] = method(action).call(v)
                 else
-                    tree[k] = convertTranslations(v)
+                    method(preaction).call(language, level, tree, k, v)
                 end
             else
                 if k=="Forms"
                     v.each{|form|
-                        doTranslations(form, language, level+1)
+                        processSubTree(form, labels, action, preaction, language, level+1)
                     }
                 else
-                    doTranslations(v, language, level+1)
+                    processSubTree(v, labels, action, preaction, language, level+1)
                 end
             end
         }
+    end
+
+    def convertPronunciation(lst)
+        result = []
+        lst.each{|line|
+            pron = {}
+            if (m=line.match(/\{\{.+IPA\|(?:[a-z]+\|)?([^\}]+)\}\}/))
+                ipa = m.captures[0]
+                pron["ipa"] = ipa.cleanIPA()
+            end
+            if (m=line.match(/\{\{a\|([^\}]+)\}\}/))
+                tag = m.captures[0]
+                pron["tag"] = tag
+            end
+
+            if pron.keys.count > 0 and pron.key? "ipa"
+                result << pron
+            end
+        }
+        return result
+    end
+
+    def convertOnyms(lst)
+        result = {}
+        lst.each{|line|
+            if (m=line.match(/\{\{sense\|([^\}]+)\}\}/))
+                sense = m.captures[0]
+                result[sense] = []
+
+                if (matches=line.scan(/\{\{l\|[a-z]+\|([^\}\|]+)(?:\||\})/))
+                    matches.each{|m|
+                        result[sense] << m[0].strip
+                    }
+                end
+            end
+        }
+        return result
+    end
+
+    def convertTerms(lst)
+        result = []
+        lst.each{|line|
+            if (m=line.match(/.*\|([^\}]+)$/))
+                if m.captures[0]!="en"
+                    result << m.captures[0].strip
+                end
+            end
+        }
+        return result
+    end
+
+    def prepareTranslations(language, level, tree, k, v)
+        if (m=v[0].match (/see translation subpage\|([^\}]+)/))
+            pos = m.captures[0]
+            subwp = WiktioParse.new(@word + "/translations")
+            subtrans = subwp.process()[language]
+
+            if subtrans.key? "Forms"
+                subtrans["Forms"].each{|form|
+                    if form.key? pos
+                        subtrans = form[pos]["Translations"]
+                        break
+                    end
+                }
+            else
+                subtrans = subtrans[pos]["Translations"]
+            end
+
+            tree[k] = subtrans
+            processSubTree(tree[k], ["Translations"], :convertTranslations, :prepareTranslations, language, level+1)
+        else
+            tree[k] = convertTranslations(v)
+        end
+    end
+
+    def convertTranslations(lst)
+        dict = {}
+        sense = ""
+
+        lst.each{|line|
+            if (m=line.match(/\{\{trans-top\|([^\}]+)\}\}/))
+                sense = m.captures[0].strip
+                dict[sense] = {}
+            else
+                matches = line.scan(/\{\{t\+?\|([a-z]+)\|([^\}\|]+)(?:\||\})/)
+                matches.each{|m|
+                    lang = m[0].strip
+                    word = m[1].strip
+
+                    dict[sense][lang] = [] if not dict[sense].key? lang
+
+                    cleanWord = word.cleanupWikitext()
+                    
+                    if $IPA.supports? lang 
+                        dict[sense][lang] << {
+                            word: cleanWord,
+                            ipa: $IPA.get(lang, cleanWord)
+                        }
+                    else
+                        dict[sense][lang] << cleanWord
+                    end
+                }
+                if matches.count > 0
+                    ap matches
+                end
+            end
+        }
+        return dict
     end
 
     def process()
@@ -378,16 +344,10 @@ class WiktioParse
         data = cleanupTree(treeify(fetched))
 
         # Translations
-        doTranslations(data)
-
-        # Synonyms & Antonyms
-        doOnyms(data)
-
-        # Derived terms & Related terms
-        doTerms(data)
-
-        # Pronunciation
-        doPronunciation(data)
+        processSubTree(data, ["Pronunciation"],                  :convertPronunciation)
+        processSubTree(data, ["Antonyms", "Synonyms"],           :convertOnyms)
+        processSubTree(data, ["Derived terms", "Related terms"], :convertTerms)
+        processSubTree(data, ["Translations"],                   :convertTranslations, :prepareTranslations)
 
         return data
     end
