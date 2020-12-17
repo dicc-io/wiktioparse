@@ -10,6 +10,10 @@
 ## Requirements
 ##############################
 
+require 'active_support'
+require 'action_view'
+require 'action_view/base'
+
 require 'awesome_print'
 require 'colorize'
 require 'csv'
@@ -47,10 +51,45 @@ class String
         return false
     end
 
+    def expandTemplates
+        info = {}
+        text = self.cleanupWikitext()
+
+        text = text.gsub(/\{\{(.*?)\}\}/){|m| 
+            c = m.tr("{}","").split("|")
+            cmd = c[0]
+            argc = c.count-1
+
+            case cmd
+            when "lb"
+                if argc==2
+                    info[:lb] = c[2]
+                end
+                ""
+            end
+        }
+
+        return {
+            info: info,
+            text: text
+        }
+    end
+
     def cleanupWikitext()
-        self.gsub("[","")
+        ret = self.gsub("[","")
             .gsub("]","")
+            .gsub("'''", "")
+            .gsub("''", "")
             .strip
+
+        return ActionView::Base.full_sanitizer.sanitize(ret)
+    end
+
+    def uncleanText?()
+        return  (self.include? "{" or 
+                 self.include? "}" or
+                 self.include? "[[" or
+                 self.include? "]]")
     end
 
     def cleanIPA()
@@ -326,7 +365,9 @@ class WiktioParse
                             ipa: $IPA.get(lang, cleanWord)
                         }
                     else
-                        dict[sense][lang] << cleanWord
+                        dict[sense][lang] << {
+                            word: cleanWord
+                        }
                     end
                 }
                 if matches.count > 0
@@ -335,6 +376,32 @@ class WiktioParse
             end
         }
         return dict
+    end
+
+    def convertDefinitions(lst)
+        result = []
+        current = nil
+        lst.each{|line|
+            if line.start_with? "# "
+                meaning = line.gsub("# ","")
+                meaningCleaned = meaning.expandTemplates
+
+                if not meaningCleaned[:text].uncleanText?
+                    result << {
+                        meaning: meaningCleaned[:text]
+                    }
+
+                    current = result.last
+                    current[:info] = meaningCleaned[:info] if meaningCleaned[:info]!={}
+                end
+
+            elsif line.start_with? "#: " and not current.nil?
+                current[:examples] = [] if not current.key? :examples
+                current[:examples] << line.gsub("#: ","").cleanupWikitext()
+            end
+        }
+        ap result
+        return result
     end
 
     def process()
@@ -348,6 +415,7 @@ class WiktioParse
         processSubTree(data, ["Antonyms", "Synonyms"],           :convertOnyms)
         processSubTree(data, ["Derived terms", "Related terms"], :convertTerms)
         processSubTree(data, ["Translations"],                   :convertTranslations, :prepareTranslations)
+        processSubTree(data, ["Definitions"],                    :convertDefinitions)
 
         return data
     end
