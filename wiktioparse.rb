@@ -31,6 +31,8 @@ $IPA = MW::IPA.new
 ## Constants
 ##############################
 
+$Debug                      = true
+
 $WiktionaryUrl              = "https://en.wiktionary.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&formatversion=2&titles="
 
 $PartsOfSpeech              = ["Adjective", "Adverb", "Noun", "Verb"]
@@ -370,9 +372,6 @@ class WiktioParse
                         }
                     end
                 }
-                if matches.count > 0
-                    ap matches
-                end
             end
         }
         return dict
@@ -400,7 +399,6 @@ class WiktioParse
                 current[:examples] << line.gsub("#: ","").cleanupWikitext()
             end
         }
-        ap result
         return result
     end
 
